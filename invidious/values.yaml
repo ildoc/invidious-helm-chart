@@ -3,7 +3,7 @@ name: invidious
 image:
   repository: quay.io/invidious/invidious
   tag: latest
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
 
 imagePullSecrets: []
 nameOverride: ""
@@ -50,6 +50,9 @@ resources: {}
 
 deploymentLabels: {}
 
+podAnnotations: {}
+podLabels: {}
+
 podSecurityContext:
   runAsUser: 1000
   runAsGroup: 1000
@@ -67,41 +70,107 @@ tolerations: []
 
 affinity: {}
 
-
 # Reference: https://github.com/bitnami/charts/tree/main/bitnami/postgresql
 postgresql:
   enabled: true
   image:
-    tag: 16
+    tag: 17
   auth:
     username: kemal
-    password: kemal
+    password: kemal  # Should be overridden with existingSecret
     database: invidious
+    # existingSecret: ""  # Name of existing secret with postgresql-password key
+
+# Invidious Companion configuration (replaces sighelper)
+companion:
+  enabled: true
+  image:
+    repository: quay.io/invidious/invidious-companion
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  service:
+    port: 8282
+  
+  resources: {}
+    # requests:
+    #   cpu: 100m
+    #   memory: 64Mi
+    # limits:
+    #   cpu: 200m
+    #   memory: 128Mi
+  
+  # Security settings from docker-compose
+  securityContext:
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+  
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  
+  env: []
+  
+  # Volume for youtube library cache
+  persistence:
+    enabled: true
+    size: 1Gi
+    accessMode: ReadWriteOnce
+    # storageClass: ""  # Use default if not specified
+    # existingClaim: ""  # Use existing PVC if specified
 
 # Reference: https://github.com/iv-org/invidious/blob/master/config/config.example.yml
 config:
   db:
     user: kemal
-    password: kemal
-    host: ""
+    password: kemal  # Should be overridden with existingSecret
+    host: ""  # Will be auto-filled if postgresql.enabled=true
     port: 5432
     dbname: invidious
+  
+  check_tables: true
   port: 3000
   domain: ""
   https_only: false
   channel_threads: 1
   full_refresh: false
   feed_threads: 1
+  
+  # Companion integration
+  invidious_companion:
+    - private_url: ""  # Will be auto-filled if companion.enabled=true
+  
+  # These should be provided via existingSecret
+  invidious_companion_key: ""  # Required if companion.enabled=true
+  hmac_key: ""  # Required for production
+
+# Secret configuration
+# Use existingSecret to reference an existing Kubernetes secret
+# The secret should contain the following keys:
+# - postgresql-password (if using external secret for DB)
+# - invidious-companion-key
+# - hmac-key
+existingSecret: ""
+
+# Create a secret with the required keys (only if existingSecret is not provided)
+# WARNING: For production, use existingSecret instead of putting secrets in values
+secrets:
+  # companionKey: "changeme"  # SERVER_SECRET_KEY for companion
+  # hmacKey: "changeme"  # HMAC key for Invidious
+  # postgresqlPassword: "changeme"  # PostgreSQL password
 
 env: []
 
-sighelper:
+# Health check configuration
+healthcheck:
   enabled: true
-  resources: {}
-  service:
-    port: 12999
-  image:
-    repository: quay.io/invidious/inv-sig-helper
-    tag: latest
-    pullPolicy: Always
-  env: []
+  path: /api/v1/trending
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 2
