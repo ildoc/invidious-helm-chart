@@ -66,24 +66,11 @@ spec:
             - /bin/bash
             - -c
             - 'until pg_isready; do echo waiting for database; sleep 2; done'
-        - name: init-db
+        {{- if .Values.existingSecret }}
+        - name: prepare-config
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          envFrom:
-            - secretRef:
-                name: {{ template "invidious.fullname" . }}
           env:
-            {{/* Override secrets from external secret if provided */}}
-            {{- if .Values.existingSecret }}
-            - name: INVIDIOUS_CONFIG
-              value: |
-                {{- $config := deepCopy .Values.config }}
-                {{- $_ := set $config "invidious_companion_key" "$(COMPANION_KEY)" }}
-                {{- $_ := set $config "hmac_key" "$(HMAC_KEY)" }}
-                {{- if .Values.postgresql.auth.existingSecret }}
-                {{- $_ := set $config.db "password" "$(DB_PASSWORD)" }}
-                {{- $_ := set $config.db "user" "$(DB_USERNAME)" }}
-                {{- end }}
-                {{- toYaml $config | nindent 16 }}
+            # Load individual secret values
             - name: COMPANION_KEY
               valueFrom:
                 secretKeyRef:
@@ -94,11 +81,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: hmac-key
-            {{- if .Values.existingSecret }}
+            {{- if .Values.postgresql.auth.existingSecret }}
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.existingSecret  }}
+                  name: {{ .Values.existingSecret }}
                   key: postgresql-password
             - name: DB_USERNAME
               valueFrom:
@@ -106,12 +93,56 @@ spec:
                   name: {{ .Values.existingSecret }}
                   key: postgresql-username
             {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ template "invidious.fullname" . }}
+          volumeMounts:
+            - name: processed-config
+              mountPath: /shared
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              # Process the config template by replacing placeholders with actual values
+              sed -e "s/__COMPANION_KEY__/${COMPANION_KEY}/g" \
+                  -e "s/__HMAC_KEY__/${HMAC_KEY}/g" \
+                  {{- if .Values.postgresql.auth.existingSecret }}
+                  -e "s/__DB_PASSWORD__/${DB_PASSWORD}/g" \
+                  -e "s/__DB_USERNAME__/${DB_USERNAME}/g" \
+                  {{- end }} \
+                  <<< "${INVIDIOUS_CONFIG_TEMPLATE}" > /shared/invidious_config.yml
+              echo "Configuration processed and saved to /shared/invidious_config.yml"
+        {{- end }}
+        - name: init-db
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- if .Values.existingSecret }}
+          env:
+            # Load the processed configuration
+            - name: INVIDIOUS_CONFIG
+              value: "$(cat /shared/invidious_config.yml)"
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
             {{- end }}
+          volumeMounts:
+            - name: processed-config
+              mountPath: /shared
+          command: ["/bin/bash", "-c"]
+          args: 
+            - |
+              # Load the processed configuration
+              export INVIDIOUS_CONFIG="$(cat /shared/invidious_config.yml)"
+              # Run the migration
+              exec /sbin/tini -- /invidious/invidious --migrate
+          {{- else }}
+          envFrom:
+            - secretRef:
+                name: {{ template "invidious.fullname" . }}
+          env:
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
           command: ["/sbin/tini", "--"]
           args: ["/invidious/invidious", "--migrate"]
+          {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
@@ -122,48 +153,33 @@ spec:
             - name: http
               containerPort: {{ .Values.config.port }}
               protocol: TCP
+          {{- if .Values.existingSecret }}
+          env:
+            # Load the processed configuration
+            - name: INVIDIOUS_CONFIG
+              value: "$(cat /shared/invidious_config.yml)"
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: processed-config
+              mountPath: /shared
+          command: ["/bin/bash", "-c"]
+          args: 
+            - |
+              # Load the processed configuration
+              export INVIDIOUS_CONFIG="$(cat /shared/invidious_config.yml)"
+              # Start the application
+              exec /sbin/tini -- /invidious/invidious
+          {{- else }}
           envFrom:
             - secretRef:
                 name: {{ template "invidious.fullname" . }}
           env:
-            {{/* Override secrets from external secret if provided */}}
-            {{- if .Values.existingSecret }}
-            - name: INVIDIOUS_CONFIG
-              value: |
-                {{- $config := deepCopy .Values.config }}
-                {{- $_ := set $config "invidious_companion_key" "$(COMPANION_KEY)" }}
-                {{- $_ := set $config "hmac_key" "$(HMAC_KEY)" }}
-                {{- if .Values.postgresql.auth.existingSecret }}
-                {{- $_ := set $config.db "password" "$(DB_PASSWORD)" }}
-                {{- $_ := set $config.db "user" "$(DB_USERNAME)" }}
-                {{- end }}
-                {{- toYaml $config | nindent 16 }}
-            - name: COMPANION_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.existingSecret }}
-                  key: invidious-companion-key
-            - name: HMAC_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.existingSecret }}
-                  key: hmac-key
-            {{- if .Values.existingSecret }}
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.existingSecret }}
-                  key: postgresql-password
-            - name: DB_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.existingSecret }}
-                  key: postgresql-username
-            {{- end }}
-            {{- end }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- if .Values.healthcheck.enabled }}
@@ -206,6 +222,11 @@ spec:
             failureThreshold: 30
           {{- end }}
       restartPolicy: Always
+      {{- if .Values.existingSecret }}
+      volumes:
+        - name: processed-config
+          emptyDir: {}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
