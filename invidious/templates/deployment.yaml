@@ -117,21 +117,28 @@ spec:
         - name: init-db
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           {{- if .Values.existingSecret }}
-          env:
-            # Load the processed configuration
-            - name: INVIDIOUS_CONFIG
-              value: "$(cat /shared/invidious_config.yml)"
-            {{- with .Values.env }}
-            {{- toYaml . | nindent 12 }}
-            {{- end }}
           volumeMounts:
             - name: processed-config
               mountPath: /shared
           command: ["/bin/sh", "-c"]
           args: 
             - |
+              # Wait for the configuration file to be ready
+              while [ ! -f /shared/invidious_config.yml ] || [ ! -s /shared/invidious_config.yml ]; do
+                echo "Waiting for configuration to be prepared..."
+                sleep 2
+              done
+              
               # Load the processed configuration
               export INVIDIOUS_CONFIG="$(cat /shared/invidious_config.yml)"
+              {{- with .Values.env }}
+              {{- range . }}
+              export {{ .name }}="{{ .value }}"
+              {{- end }}
+              {{- end }}
+              # Debug: show some config content
+              echo "Configuration loaded, first few lines:"
+              head -5 /shared/invidious_config.yml
               # Run the migration
               exec /sbin/tini -- /invidious/invidious --migrate
           {{- else }}
@@ -156,21 +163,28 @@ spec:
               containerPort: {{ .Values.config.port }}
               protocol: TCP
           {{- if .Values.existingSecret }}
-          env:
-            # Load the processed configuration
-            - name: INVIDIOUS_CONFIG
-              value: "$(cat /shared/invidious_config.yml)"
-            {{- with .Values.env }}
-            {{- toYaml . | nindent 12 }}
-            {{- end }}
           volumeMounts:
             - name: processed-config
               mountPath: /shared
           command: ["/bin/sh", "-c"]
           args: 
             - |
+              # Wait for the configuration file to be ready
+              while [ ! -f /shared/invidious_config.yml ] || [ ! -s /shared/invidious_config.yml ]; do
+                echo "Waiting for configuration to be prepared..."
+                sleep 2
+              done
+              
               # Load the processed configuration
               export INVIDIOUS_CONFIG="$(cat /shared/invidious_config.yml)"
+              {{- with .Values.env }}
+              {{- range . }}
+              export {{ .name }}="{{ .value }}"
+              {{- end }}
+              {{- end }}
+              # Debug: show some config content
+              echo "Configuration loaded, first few lines:"
+              head -5 /shared/invidious_config.yml
               # Start the application
               exec /sbin/tini -- /invidious/invidious
           {{- else }}
