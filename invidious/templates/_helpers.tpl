@@ -55,6 +55,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Initialize default values and validate database configuration
 */}}
 {{- define "invidious.init-defaults" -}}
+    {{/* Configure PostgreSQL to use existingSecret if specified */}}
+    {{- if .Values.existingSecret }}
+        {{- $_ := set .Values.postgresql.auth "existingSecret" .Values.existingSecret }}
+    {{- end }}
+
     {{/* Set default PostgreSQL host if using in-chart PostgreSQL */}}
     {{- if .Values.postgresql.enabled }}
         {{- if not .Values.config.db.host }}

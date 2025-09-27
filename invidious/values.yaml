@@ -270,6 +270,16 @@ postgresql:
     password: kemal
     # -- PostgreSQL database name
     database: invidious
+    # -- Use existing secret for PostgreSQL authentication (matches main existingSecret)
+    # When existingSecret is specified, this will be automatically set to reference the same secret
+    existingSecret: ""
+    # -- Key in the existingSecret that contains the PostgreSQL user password
+    secretKeys:
+      adminPasswordKey: postgresql-password
+      userPasswordKey: postgresql-password
+      # -- Key for PostgreSQL admin (postgres user) password
+      # Use postgresql-password for both admin and user for simplicity
+      replicationPasswordKey: postgresql-password
 
 # -- Invidious Companion configuration (replaces sighelper for YouTube interaction)
 companion:
@@ -392,13 +402,21 @@ config:
 
 # -- Secret management configuration
 # Use existingSecret to reference an existing Kubernetes secret for production deployments
-# This same secret will be used for both Invidious and PostgreSQL authentication
+# This secret will be used for ALL authentication (Invidious + PostgreSQL)
+# When existingSecret is specified, it automatically overrides in-clear credentials
 existingSecret: ""
-# The secret should contain the following keys:
-# - postgresql-username (PostgreSQL username - matches auth.username)
-# - postgres-password (PostgreSQL postgres superuser password)
-# - invidious-companion-key
-# - hmac-key
+# The secret must contain the following keys:
+# - postgresql-username (PostgreSQL username - overrides auth.username)
+# - postgresql-password (PostgreSQL password - overrides auth.password)
+# - invidious-companion-key (Companion authentication key)
+# - hmac-key (HMAC key for signing)
+#
+# Example secret creation:
+# kubectl create secret generic invidious-secrets \
+#   --from-literal=postgresql-username=kemal \
+#   --from-literal=postgresql-password=secure-db-password \
+#   --from-literal=invidious-companion-key=secure-companion-key \
+#   --from-literal=hmac-key=secure-hmac-key
 
 # -- Additional environment variables for the Invidious container
 # Example:
