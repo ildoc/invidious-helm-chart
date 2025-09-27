@@ -1,0 +1,66 @@
+{{- if .Values.gateway.enabled -}}
+{{- $fullName := include "invidious.fullname" . -}}
+{{- $svcPort := .Values.service.port -}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "invidious.labels" . | nindent 4 }}
+  {{- with .Values.gateway.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.gateway.parentRefs }}
+  parentRefs:
+    {{- toYaml .Values.gateway.parentRefs | nindent 4 }}
+  {{- else }}
+  parentRefs:
+    - name: {{ .Values.gateway.gatewayName | default "gateway" }}
+      {{- if .Values.gateway.gatewayNamespace }}
+      namespace: {{ .Values.gateway.gatewayNamespace }}
+      {{- end }}
+  {{- end }}
+  
+  {{- if .Values.gateway.hostnames }}
+  hostnames:
+    {{- range .Values.gateway.hostnames }}
+    - {{ . | quote }}
+    {{- end }}
+  {{- end }}
+  
+  rules:
+    {{- range .Values.gateway.rules }}
+    - matches:
+        {{- range .matches }}
+        - {{- if .path }}
+          path:
+            type: {{ .path.type | default "PathPrefix" }}
+            value: {{ .path.value | default "/" }}
+          {{- else }}
+          path:
+            type: PathPrefix
+            value: "/"
+          {{- end }}
+          {{- if .method }}
+          method: {{ .method }}
+          {{- end }}
+          {{- if .headers }}
+          headers:
+            {{- toYaml .headers | nindent 12 }}
+          {{- end }}
+        {{- end }}
+      backendRefs:
+        - name: {{ $fullName }}
+          port: {{ $svcPort }}
+          {{- if .weight }}
+          weight: {{ .weight }}
+          {{- end }}
+      {{- if .filters }}
+      filters:
+        {{- toYaml .filters | nindent 8 }}
+      {{- end }}
+    {{- end }}
+{{- end }}

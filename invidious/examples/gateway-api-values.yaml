@@ -1,0 +1,114 @@
+# Gateway API Configuration Example for Invidious
+# 
+# This example demonstrates how to use Gateway API with Invidious
+# instead of traditional Ingress resources.
+#
+# Prerequisites:
+# 1. Gateway API CRDs must be installed in your cluster
+# 2. A Gateway controller (e.g., Istio, Envoy Gateway, etc.) must be running
+# 3. A Gateway resource must exist
+
+# Use Gateway API instead of Ingress
+ingress:
+  enabled: false
+
+# Gateway API configuration
+gateway:
+  enabled: true
+  
+  # Reference to existing Gateway resource
+  gatewayName: "invidious-gateway"
+  gatewayNamespace: "gateway-system"
+  
+  # Alternative: Use parentRefs for more control
+  # parentRefs:
+  #   - name: shared-gateway
+  #     namespace: gateway-system
+  #     sectionName: http
+  #     port: 80
+  #   - name: shared-gateway
+  #     namespace: gateway-system
+  #     sectionName: https
+  #     port: 443
+  
+  # Hostnames this application responds to
+  hostnames:
+    - "invidious.example.com"
+    - "invidious-alt.example.com"
+  
+  # HTTP routing rules with advanced features
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
+      # Advanced routing filters (Gateway API exclusive features)
+      filters:
+        # Add security headers
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            add:
+              X-Frame-Options: "DENY"
+              X-Content-Type-Options: "nosniff"
+              X-XSS-Protection: "1; mode=block"
+              Referrer-Policy: "strict-origin-when-cross-origin"
+        # Set forwarding headers
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              X-Forwarded-Proto: "https"
+            add:
+              X-Real-IP: "%{remote_addr}"
+    
+    # Example: API-specific routing
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/api/"
+        - headers:
+            - name: "Content-Type" 
+              type: "RegularExpression"
+              value: "application/json.*"
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            add:
+              X-API-Request: "true"
+  
+  # TLS configuration (optional, for HTTPS termination at Gateway)
+  tls:
+    enabled: true
+    hostnames:
+      - "invidious.example.com"
+      - "invidious-alt.example.com"
+
+# Example Gateway resource to create alongside the chart
+# (This would typically be managed separately)
+exampleGateway:
+  enabled: false
+  name: "invidious-gateway"
+  namespace: "gateway-system"
+  gatewayClassName: "istio"  # or your Gateway controller class
+  listeners:
+    - name: http
+      hostname: "invidious.example.com"
+      port: 80
+      protocol: HTTP
+    - name: https
+      hostname: "invidious.example.com" 
+      port: 443
+      protocol: HTTPS
+      tls:
+        certificateRefs:
+          - name: invidious-tls-cert
+            kind: Secret
+
+# Service configuration (same as with Ingress)
+service:
+  type: ClusterIP
+  port: 3000
+
+# Application configuration
+config:
+  domain: "invidious.example.com"
+  https_only: true

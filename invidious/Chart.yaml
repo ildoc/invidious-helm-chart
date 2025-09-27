@@ -4,16 +4,14 @@ description: Invidious is an alternative front-end to YouTube
 
 type: application
 
-version: 2.3.0
-appVersion: v2.20240427
+version: 3.0.0
+appVersion: v3.20250926
 
 dependencies:
   - name: postgresql
     version: ~14.3.1
     repository: "oci://registry-1.docker.io/bitnamicharts"
     condition: postgresql.enabled
-
-engine: gotpl
 
 keywords:
   - youtube
@@ -32,3 +30,5 @@ maintainers:
     email: mail@leonklingele.de
   - name: JuniorJPDJ
     url: https://github.com/JuniorJPDJ
+  - name: ildoc
+    url: https://github.com/ildoc

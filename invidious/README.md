@@ -1,6 +1,20 @@
-# Invidious Helm chart
+# Invidious Helm Chart
 
 This guide explains how to deploy Invidious to Kubernetes using the Invidious Helm chart.
+
+This chart is designed to be compatible with the Invidious Docker Compose template and follows the same security and configuration practices.
+
+## Docker Compose Compatibility
+
+This chart includes configurations that mirror the Docker Compose setup:
+
+- **Same image versions**: Uses `quay.io/invidious/invidious:2025.09.24-42d34cd` and `quay.io/invidious/invidious-companion:master-a866b71`
+- **Security settings**: Implements `cap_drop: ALL`, `read_only: true`, and `no-new-privileges` equivalent
+- **Health checks**: Uses the same `wget` command for health verification
+- **Logging**: Configured with equivalent log rotation settings
+- **PostgreSQL 17**: Same database version as Docker Compose
+
+For Docker Compose compatible configuration, use the provided `values-docker-compose-compat.yaml` file.
 
 ## Installing
 

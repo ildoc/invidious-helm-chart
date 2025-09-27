@@ -1,0 +1,85 @@
+{{- if .Values.companion.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ template "invidious.fullname" . }}-companion
+  labels:
+    {{- include "invidious.labels" . | nindent 4 }}
+    app.kubernetes.io/component: companion
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "invidious.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: companion
+  serviceName: {{ template "invidious.fullname" . }}-companion
+  template:
+    metadata:
+      labels:
+        {{- include "invidious.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: companion
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.companion.podSecurityContext | nindent 8 }}
+      containers:
+        - name: companion
+          securityContext:
+            {{- toYaml .Values.companion.securityContext | nindent 12 }}
+          image: "{{ .Values.companion.image.repository }}:{{ .Values.companion.image.tag }}"
+          imagePullPolicy: {{ .Values.companion.image.pullPolicy }}
+          env:
+            - name: SERVER_SECRET_KEY
+              {{- if .Values.existingSecret }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: invidious-companion-key
+              {{- else if and .Values.secrets .Values.secrets.companionKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "invidious.fullname" . }}-secrets
+                  key: invidious-companion-key
+              {{- else }}
+              value: {{ .Values.config.invidious_companion_key | quote }}
+              {{- end }}
+            {{- with .Values.companion.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8282
+              protocol: TCP
+          volumeMounts:
+            - name: cache
+              mountPath: /var/tmp/youtubei.js
+          resources:
+            {{- toYaml .Values.companion.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: cache
+      spec:
+        accessModes: 
+          - {{ .Values.companion.persistence.accessMode | quote }}
+        {{- if .Values.companion.persistence.storageClass }}
+        storageClassName: {{ .Values.companion.persistence.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.companion.persistence.size | quote }}
+{{- end }}

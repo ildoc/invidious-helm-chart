@@ -1,0 +1,19 @@
+{{- if .Values.companion.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "invidious.fullname" . }}-companion
+  labels:
+    {{- include "invidious.labels" . | nindent 4 }}
+    app.kubernetes.io/component: companion
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.companion.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "invidious.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: companion
+{{- end }}

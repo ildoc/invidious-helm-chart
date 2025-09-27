@@ -1,0 +1,52 @@
+{{- if and .Values.gateway.enabled .Values.gateway.tls.enabled -}}
+{{- $fullName := include "invidious.fullname" . -}}
+{{- $svcPort := .Values.service.port -}}
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TLSRoute
+metadata:
+  name: {{ $fullName }}-tls
+  labels:
+    {{- include "invidious.labels" . | nindent 4 }}
+  {{- with .Values.gateway.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.gateway.parentRefs }}
+  parentRefs:
+    {{- range .Values.gateway.parentRefs }}
+    {{- if .tls }}
+    - name: {{ .name }}
+      {{- if .namespace }}
+      namespace: {{ .namespace }}
+      {{- end }}
+      {{- if .sectionName }}
+      sectionName: {{ .sectionName }}
+      {{- end }}
+      {{- if .port }}
+      port: {{ .port }}
+      {{- end }}
+    {{- end }}
+    {{- end }}
+  {{- else }}
+  parentRefs:
+    - name: {{ .Values.gateway.gatewayName | default "gateway" }}
+      {{- if .Values.gateway.gatewayNamespace }}
+      namespace: {{ .Values.gateway.gatewayNamespace }}
+      {{- end }}
+      sectionName: tls
+  {{- end }}
+  
+  {{- if .Values.gateway.tls.hostnames }}
+  hostnames:
+    {{- range .Values.gateway.tls.hostnames }}
+    - {{ . | quote }}
+    {{- end }}
+  {{- end }}
+  
+  rules:
+    - backendRefs:
+        - name: {{ $fullName }}
+          port: {{ $svcPort }}
+{{- end }}

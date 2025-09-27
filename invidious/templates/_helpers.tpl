@@ -67,12 +67,28 @@ Initialize default values and validate database configuration
         {{- end }}
     {{- end }}
 
-    {{/* Set signature server if sighelper is enabled */}}
-    {{- if .Values.sighelper.enabled }}
-        {{- if not .Values.config.signature_server }}
-        {{- $serviceName := printf "%s-sighelper" (include "invidious.fullname" .) }}
-        {{- $servicePort := .Values.sighelper.service.port | default 12999 | int }}
-        {{- $_ := set .Values.config "signature_server" (printf "%s:%d" $serviceName $servicePort) }}
+    {{/* Set companion URL if companion is enabled */}}
+    {{- if .Values.companion.enabled }}
+        {{- if not (index .Values.config.invidious_companion 0).private_url }}
+        {{- $serviceName := printf "%s-companion" (include "invidious.fullname" .) }}
+        {{- $servicePort := .Values.companion.service.port | default 8282 | int }}
+        {{- $companionUrl := printf "http://%s:%d/companion" $serviceName $servicePort }}
+        {{- $_ := set (index .Values.config.invidious_companion 0) "private_url" $companionUrl }}
         {{- end }}
+        
+        {{/* Validate companion key is provided */}}
+        {{- if and (not .Values.existingSecret) (not (and .Values.secrets .Values.secrets.companionKey)) (not .Values.config.invidious_companion_key) }}
+        {{- fail "invidious_companion_key must be set when companion.enabled is true (via existingSecret, secrets.companionKey, or config.invidious_companion_key)" }}
+        {{- end }}
+    {{- end }}
+
+    {{/* Validate HMAC key for production */}}
+    {{- if and (not .Values.existingSecret) (not (and .Values.secrets .Values.secrets.hmacKey)) (not .Values.config.hmac_key) }}
+    {{- fail "hmac_key should be set for production use (via existingSecret, secrets.hmacKey, or config.hmac_key)" }}
+    {{- end }}
+
+    {{/* Validate that Gateway and Ingress are not both enabled */}}
+    {{- if and .Values.gateway.enabled .Values.ingress.enabled }}
+    {{- fail "Cannot enable both gateway.enabled and ingress.enabled at the same time. Choose one routing method." }}
     {{- end }}
 {{- end -}}

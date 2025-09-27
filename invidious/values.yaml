@@ -1,107 +1,435 @@
+# Default values for invidious.
+# This is a YAML-formatted file.
+# Declare variables to be substituted into your templates.
+#
+# This chart deploys Invidious, an alternative front-end to YouTube
+# that is compatible with the original Docker Compose configuration.
+#
+# For Docker Compose compatibility, see: values-docker-compose-compat.yaml
+#
+# Documentation conventions:
+# -- Comments starting with -- are processed by helm-docs
+# Regular comments provide additional context and examples
+
+# -- Override the name of the chart
 name: invidious
 
+# -- Container image configuration
 image:
+  # -- Invidious container image repository
   repository: quay.io/invidious/invidious
-  tag: latest
-  pullPolicy: Always
+  # -- Invidious container image tag (aligned with docker-compose template)
+  # @default -- Chart appVersion
+  tag: "2025.09.24-42d34cd"
+  # -- Invidious container image pull policy
+  pullPolicy: IfNotPresent
 
+# -- Secrets for pulling images from private registries
 imagePullSecrets: []
+# -- Override the name of the chart
 nameOverride: ""
+# -- Override the fullname of the release
 fullnameOverride: ""
 
+# -- Number of Invidious replicas to deploy
 # Setting replicaCount higher than 1 may cause PostgreSQL database deadlocks.
 # This happens when multiple Invidious processes simultaneously attempt to refresh channel subscriptions for users.
 replicaCount: 1
 
+# -- Horizontal Pod Autoscaler configuration
 autoscaling:
+  # -- Enable Horizontal Pod Autoscaler
   enabled: false
+  # -- Minimum number of replicas
   minReplicas: 1
+  # -- Maximum number of replicas
   maxReplicas: 16
+  # -- Target CPU utilization percentage for autoscaling
   targetCPUUtilizationPercentage: 50
+  # -- Target memory utilization percentage for autoscaling (uncomment to enable)
+  # targetMemoryUtilizationPercentage: 80
 
+# -- Kubernetes Service configuration
 service:
+  # -- Service type (ClusterIP, NodePort, LoadBalancer)
   type: ClusterIP
+  # -- Service port
   port: 3000
+  # -- Load balancer IP (only for LoadBalancer service type)
   # loadBalancerIP:
 
+# -- Ingress configuration
 ingress:
+  # -- Enable ingress controller resource
   enabled: false
+  # -- Ingress class name (e.g., nginx, traefik)
   className: ""
+  # -- Ingress annotations
   annotations: {}
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  # -- Ingress hosts configuration
   hosts:
     - host: chart-example.local
       paths:
         - path: /
           pathType: ImplementationSpecific
+  # -- TLS configuration for ingress
   tls: []
   #  - secretName: chart-example-tls
   #    hosts:
   #      - chart-example.local
 
-resources: {}
-  # requests:
-  #   cpu: 100m
-  #   memory: 64Mi
-  # limits:
-  #   cpu: 800m
-  #   memory: 512Mi
+# -- Gateway API configuration (alternative to Ingress)
+# Gateway API provides more advanced routing capabilities than traditional Ingress
+# Requires Gateway API CRDs to be installed in the cluster
+# For more info: https://gateway-api.sigs.k8s.io/
+gateway:
+  # -- Enable Gateway API HTTPRoute (alternative to ingress)
+  # Note: Cannot be used together with ingress.enabled=true
+  enabled: false
+  # -- Gateway API annotations
+  annotations: {}
+    # gateway.networking.k8s.io/route-timeout: "30s"
+  # -- Parent gateway references (gateways that this HTTPRoute attaches to)
+  # Use this for fine-grained control over which Gateway listeners to attach to
+  parentRefs: []
+    # - name: shared-gateway
+    #   namespace: gateway-system
+    #   sectionName: https
+    #   port: 443
+  # -- Default gateway name (used if parentRefs is empty)
+  gatewayName: "gateway"
+  # -- Default gateway namespace (leave empty to use same namespace as release)
+  gatewayNamespace: ""
+  # -- Hostnames that this HTTPRoute responds to
+  # These must match the hostnames configured in the Gateway resource
+  hostnames: []
+    # - invidious.example.com
+  # -- HTTP routing rules with advanced Gateway API features
+  rules:
+    # -- Default rule matching all requests to root path
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
+      # -- Optional: Advanced routing filters (Gateway API exclusive features)
+      # filters:
+      #   - type: RequestHeaderModifier
+      #     requestHeaderModifier:
+      #       set:
+      #         X-Forwarded-Proto: https
+      #       add:
+      #         X-Real-IP: "%{remote_addr}"
+      #   - type: ResponseHeaderModifier  
+      #     responseHeaderModifier:
+      #       add:
+      #         X-Frame-Options: DENY
+      #         X-Content-Type-Options: nosniff
+  
+  # -- TLS configuration for Gateway API (creates TLSRoute resource)
+  # Requires Gateway API v1alpha2+ and TLSRoute support
+  tls:
+    # -- Enable TLS termination at the Gateway (creates TLSRoute)
+    # Note: This is for TLS passthrough or SNI-based routing
+    enabled: false
+    # -- Hostnames for TLS termination (must match Gateway listener hostnames)
+    hostnames: []
+      # - invidious.example.com
 
+# -- Optional: Create a Gateway resource alongside HTTPRoute
+# Typically Gateways are managed separately, but this can be useful for demos
+exampleGateway:
+  # -- Create an example Gateway resource (for development/testing)
+  enabled: false
+  # -- Gateway name
+  name: "invidious-gateway" 
+  # -- Gateway namespace (defaults to release namespace)
+  namespace: ""
+  # -- Gateway class (depends on your Gateway controller)
+  gatewayClassName: "istio"  # Examples: istio, envoy-gateway, kong
+  # -- Gateway listeners configuration
+  listeners:
+    - name: http
+      hostname: "invidious.example.com"
+      port: 80
+      protocol: HTTP
+    - name: https
+      hostname: "invidious.example.com"
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: invidious-tls-cert
+            kind: Secret
+
+# -- Resource limits and requests
+resources:
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # -- Resource limits
+  limits:
+    # -- CPU limit (1000m = 1 CPU core)
+    cpu: 1000m
+    # -- Memory limit
+    memory: 1Gi
+  # -- Resource requests (minimum guaranteed resources)
+  requests:
+    # -- CPU request
+    cpu: 500m
+    # -- Memory request
+    memory: 512Mi
+
+# -- Additional labels to add to the deployment resource
 deploymentLabels: {}
 
+# -- Pod annotations (Docker-compose equivalent logging configuration)
+# These annotations can be used by logging operators like Fluentd/Fluent Bit
+podAnnotations: 
+  # -- Maximum log file size (equivalent to docker-compose max-size)
+  logging.options.max-size: "1G"
+  # -- Maximum number of log files to retain (equivalent to docker-compose max-file)
+  logging.options.max-file: "4"
+
+# -- Additional labels to add to pods
+podLabels: {}
+
+# -- Pod security context (controls pod-level security attributes)
 podSecurityContext:
+  # -- Run containers as user ID 1000
   runAsUser: 1000
+  # -- Run containers as group ID 1000
   runAsGroup: 1000
+  # -- Set filesystem group ID
   fsGroup: 1000
 
+# -- Container security context (controls container-level security attributes)
 securityContext:
+  # -- Prevent privilege escalation
   allowPrivilegeEscalation: false
+  # -- Linux capabilities to drop (security hardening)
   capabilities:
     drop:
+      # -- Drop all capabilities (principle of least privilege)
       - ALL
 
+# -- Node selector for pod assignment
+# Example: kubernetes.io/arch: amd64
 nodeSelector: {}
 
+# -- Tolerations for pod assignment
+# Example:
+# - key: "key"
+#   operator: "Equal"
+#   value: "value"
+#   effect: "NoSchedule"
 tolerations: []
 
+# -- Affinity rules for pod assignment
+# Example for anti-affinity to avoid multiple pods on same node:
+# podAntiAffinity:
+#   requiredDuringSchedulingIgnoredDuringExecution:
+#   - labelSelector:
+#       matchExpressions:
+#       - key: app.kubernetes.io/name
+#         operator: In
+#         values:
+#         - invidious
+#     topologyKey: kubernetes.io/hostname
 affinity: {}
 
+# -- Network Policy configuration for network isolation
+networkPolicy:
+  # -- Enable NetworkPolicy (requires CNI support like Calico, Cilium)
+  enabled: false
+  # -- List of namespaces allowed to access this application
+  # allowedIngressNamespaces: []
+  # -- List of pod selectors allowed to access this application
+  # allowedIngressPods: []
+  # -- Egress rules (if not specified, all egress is allowed)
+  # egress: []
 
+# -- PostgreSQL dependency configuration
 # Reference: https://github.com/bitnami/charts/tree/main/bitnami/postgresql
 postgresql:
+  # -- Enable PostgreSQL dependency (disable to use external database)
   enabled: true
+  # -- PostgreSQL image configuration
   image:
-    tag: 16
+    # -- PostgreSQL version (aligned with docker-compose)
+    tag: 17
+  # -- PostgreSQL authentication configuration
   auth:
+    # -- PostgreSQL username
     username: kemal
+    # -- PostgreSQL password (SECURITY: Use existingSecret in production!)
     password: kemal
+    # -- PostgreSQL database name
     database: invidious
+    # -- Name of existing secret with postgresql-password key (recommended for production)
+    # existingSecret: ""
 
+# -- Invidious Companion configuration (replaces sighelper for YouTube interaction)
+companion:
+  # -- Enable Invidious Companion deployment
+  enabled: true
+  # -- Companion container image configuration
+  image:
+    # -- Companion container image repository
+    repository: quay.io/invidious/invidious-companion
+    # -- Companion container image tag (aligned with docker-compose template)
+    tag: "master-a866b71"
+    # -- Companion container image pull policy
+    pullPolicy: IfNotPresent
+  
+  # -- Companion service configuration
+  service:
+    # -- Companion service port
+    port: 8282
+  
+  # -- Companion resource limits and requests
+  resources:
+    # -- Resource limits for companion
+    limits:
+      # -- CPU limit for companion
+      cpu: 200m
+      # -- Memory limit for companion
+      memory: 256Mi
+    # -- Resource requests for companion
+    requests:
+      # -- CPU request for companion
+      cpu: 100m
+      # -- Memory request for companion
+      memory: 128Mi
+  
+  # -- Security settings for companion container (aligned with docker-compose)
+  securityContext:
+    # -- Mount root filesystem as read-only
+    readOnlyRootFilesystem: true
+    # -- Prevent privilege escalation
+    allowPrivilegeEscalation: false
+    # -- Run as non-root user
+    runAsNonRoot: true
+    # -- Drop all Linux capabilities
+    capabilities:
+      drop:
+        - ALL
+  
+  # -- Security settings for companion pod
+  podSecurityContext:
+    # -- Run as non-root user
+    runAsNonRoot: true
+    # -- User ID to run companion as
+    runAsUser: 1000
+    # -- Group ID to run companion as
+    runAsGroup: 1000
+    # -- Filesystem group ID
+    fsGroup: 1000
+    # -- Seccomp profile (equivalent to docker-compose no-new-privileges:true)
+    seccompProfile:
+      type: RuntimeDefault
+  
+  # -- Additional environment variables for companion
+  env: []
+  
+  # -- Persistent volume configuration for companion cache
+  persistence:
+    # -- Enable persistent volume for YouTube library cache
+    enabled: true
+    # -- Size of the persistent volume
+    size: 1Gi
+    # -- Access mode for the persistent volume
+    accessMode: ReadWriteOnce
+    # -- Storage class name (leave empty to use default)
+    # storageClass: ""
+    # -- Use existing PVC instead of creating new one
+    # existingClaim: ""
+
+# -- Invidious application configuration
 # Reference: https://github.com/iv-org/invidious/blob/master/config/config.example.yml
 config:
+  # -- Database connection configuration
   db:
+    # -- Database username
     user: kemal
+    # -- Database password (SECURITY: Use existingSecret in production!)
     password: kemal
+    # -- Database host (auto-filled if postgresql.enabled=true)
     host: ""
+    # -- Database port
     port: 5432
+    # -- Database name
     dbname: invidious
+  
+  # -- Check and create database tables on startup
+  check_tables: true
+  # -- Port for Invidious application to listen on
   port: 3000
+  # -- Domain name for the instance (e.g., invidio.us)
   domain: ""
+  # -- Force HTTPS redirects
   https_only: false
+  # -- Number of threads for processing channel data
   channel_threads: 1
+  # -- Perform full refresh of channel subscriptions
   full_refresh: false
+  # -- Number of threads for processing RSS feeds
   feed_threads: 1
+  
+  # -- Companion integration configuration
+  invidious_companion:
+    # -- Companion service URL (auto-filled if companion.enabled=true)
+    - private_url: ""
+  
+  # -- Companion authentication key (SECURITY: Use existingSecret in production!)
+  # Required if companion.enabled=true
+  invidious_companion_key: ""
+  # -- HMAC key for signing (SECURITY: Use existingSecret in production!)
+  # Required for production use
+  hmac_key: ""
 
+# -- Secret management configuration
+# Use existingSecret to reference an existing Kubernetes secret for production deployments
+existingSecret: ""
+# The secret should contain the following keys:
+# - postgresql-password (if using external secret for DB)
+# - invidious-companion-key
+# - hmac-key
+
+# -- Create secrets inline (NOT recommended for production)
+# WARNING: For production, use existingSecret instead of putting secrets in values
+# This creates a Kubernetes secret with the specified values
+secrets:
+  # -- Companion authentication key (uncomment and set for development only)
+  # companionKey: "changeme"
+  # -- HMAC signing key (uncomment and set for development only)
+  # hmacKey: "changeme"
+  # -- PostgreSQL password (uncomment and set for development only)
+  # postgresqlPassword: "changeme"
+
+# -- Additional environment variables for the Invidious container
+# Example:
+# env:
+#   - name: CUSTOM_VAR
+#     value: "custom_value"
 env: []
 
-sighelper:
+# -- Health check configuration (aligned with docker-compose)
+healthcheck:
+  # -- Enable health checks for the application
   enabled: true
-  resources: {}
-  service:
-    port: 12999
-  image:
-    repository: quay.io/invidious/inv-sig-helper
-    tag: latest
-    pullPolicy: Always
-  env: []
+  # -- Health check command (uses same command as docker-compose)
+  # Uses wget to check if the trending API endpoint responds
+  command: ["CMD-SHELL", "wget -nv --tries=1 --spider http://127.0.0.1:3000/api/v1/trending || exit 1"]
+  # -- Initial delay before first health check (seconds)
+  initialDelaySeconds: 30
+  # -- Interval between health checks (seconds)
+  periodSeconds: 30
+  # -- Timeout for each health check (seconds)
+  timeoutSeconds: 5
+  # -- Number of failures before marking as unhealthy
+  failureThreshold: 2
