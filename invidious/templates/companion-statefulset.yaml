@@ -38,11 +38,6 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: invidious-companion-key
-              {{- else if and .Values.secrets .Values.secrets.companionKey }}
-              valueFrom:
-                secretKeyRef:
-                  name: {{ template "invidious.fullname" . }}-secrets
-                  key: invidious-companion-key
               {{- else }}
               value: {{ .Values.config.invidious_companion_key | quote }}
               {{- end }}

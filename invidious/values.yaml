@@ -397,21 +397,9 @@ config:
 existingSecret: ""
 # The secret should contain the following keys:
 # - postgresql-password (if using external secret for DB)
+# - postgresql-username (if using external secret for DB)
 # - invidious-companion-key
 # - hmac-key
-
-# -- Create secrets inline (NOT recommended for production)
-# WARNING: For production, use existingSecret instead of putting secrets in values
-# This creates a Kubernetes secret with the specified values
-secrets: {}
-  # -- Companion authentication key (uncomment and set for development only)
-  # companionKey: "changeme"
-  # -- HMAC signing key (uncomment and set for development only)
-  # hmacKey: "changeme"
-  # -- PostgreSQL password (uncomment and set for development only)
-  # postgresqlPassword: "changeme"
-  # -- PostgreSQL username (uncomment and set for development only)
-  # postgresqlUsername: "kemal"
 
 # -- Additional environment variables for the Invidious container
 # Example:

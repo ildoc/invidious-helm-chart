@@ -42,19 +42,22 @@ spec:
               value: {{ .Values.config.db.host | quote }}
             - name: PGPORT
               value: {{ .Values.config.db.port | quote }}
+            {{- if .Values.existingSecret }}
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: postgresql-username
+            {{- else }}
             - name: PGUSER
               value: {{ .Values.config.db.user | quote }}
-            {{- if or .Values.existingSecret (and .Values.secrets .Values.secrets.postgresqlPassword) }}
+            {{- end }}
+            {{- if .Values.existingSecret }}
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.existingSecret }}
                   name: {{ .Values.existingSecret }}
                   key: postgresql-password
-                  {{- else }}
-                  name: {{ template "invidious.fullname" . }}-secrets
-                  key: postgresql-password
-                  {{- end }}
             {{- else }}
             - name: PGPASSWORD
               value: {{ .Values.config.db.password | quote }}
@@ -78,6 +81,7 @@ spec:
                 {{- $_ := set $config "hmac_key" "$(HMAC_KEY)" }}
                 {{- if .Values.postgresql.auth.existingSecret }}
                 {{- $_ := set $config.db "password" "$(DB_PASSWORD)" }}
+                {{- $_ := set $config.db "user" "$(DB_USERNAME)" }}
                 {{- end }}
                 {{- toYaml $config | nindent 16 }}
             - name: COMPANION_KEY
@@ -96,6 +100,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.postgresql.auth.existingSecret }}
                   key: postgresql-password
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.auth.existingSecret }}
+                  key: postgresql-username
             {{- end }}
             {{- end }}
             {{- with .Values.env }}
@@ -126,6 +135,7 @@ spec:
                 {{- $_ := set $config "hmac_key" "$(HMAC_KEY)" }}
                 {{- if .Values.postgresql.auth.existingSecret }}
                 {{- $_ := set $config.db "password" "$(DB_PASSWORD)" }}
+                {{- $_ := set $config.db "user" "$(DB_USERNAME)" }}
                 {{- end }}
                 {{- toYaml $config | nindent 16 }}
             - name: COMPANION_KEY
@@ -144,6 +154,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.postgresql.auth.existingSecret }}
                   key: postgresql-password
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.auth.existingSecret }}
+                  key: postgresql-username
             {{- end }}
             {{- end }}
             {{- with .Values.env }}
