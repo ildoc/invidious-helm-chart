@@ -63,7 +63,7 @@ spec:
               value: {{ .Values.config.db.password | quote }}
             {{- end }}
           command:
-            - /bin/bash
+            - /bin/sh
             - -c
             - 'until pg_isready; do echo waiting for database; sleep 2; done'
         {{- if .Values.existingSecret }}
@@ -99,18 +99,20 @@ spec:
           volumeMounts:
             - name: processed-config
               mountPath: /shared
-          command: ["/bin/bash", "-c"]
+          command: ["/bin/sh", "-c"]
           args:
             - |
               # Process the config template by replacing placeholders with actual values
-              sed -e "s/__COMPANION_KEY__/${COMPANION_KEY}/g" \
+              printf '%s\n' "${INVIDIOUS_CONFIG_TEMPLATE}" | sed \
+                  -e "s/__COMPANION_KEY__/${COMPANION_KEY}/g" \
                   -e "s/__HMAC_KEY__/${HMAC_KEY}/g" \
                   {{- if .Values.postgresql.auth.existingSecret }}
                   -e "s/__DB_PASSWORD__/${DB_PASSWORD}/g" \
                   -e "s/__DB_USERNAME__/${DB_USERNAME}/g" \
                   {{- end }} \
-                  <<< "${INVIDIOUS_CONFIG_TEMPLATE}" > /shared/invidious_config.yml
+                  > /shared/invidious_config.yml
               echo "Configuration processed and saved to /shared/invidious_config.yml"
+              cat /shared/invidious_config.yml
         {{- end }}
         - name: init-db
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -125,7 +127,7 @@ spec:
           volumeMounts:
             - name: processed-config
               mountPath: /shared
-          command: ["/bin/bash", "-c"]
+          command: ["/bin/sh", "-c"]
           args: 
             - |
               # Load the processed configuration
@@ -164,7 +166,7 @@ spec:
           volumeMounts:
             - name: processed-config
               mountPath: /shared
-          command: ["/bin/bash", "-c"]
+          command: ["/bin/sh", "-c"]
           args: 
             - |
               # Load the processed configuration
