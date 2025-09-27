@@ -57,7 +57,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
-                  key: password
+                  key: postgresql-password
             {{- else }}
             - name: PGPASSWORD
               value: {{ .Values.config.db.password | quote }}
@@ -94,17 +94,17 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: hmac-key
-            {{- if .Values.postgresql.auth.existingSecret }}
+            {{- if .Values.existingSecret }}
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.postgresql.auth.existingSecret }}
-                  key: password
+                  name: {{ .Values.existingSecret  }}
+                  key: postgresql-password
             - name: DB_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.postgresql.auth.existingSecret }}
-                  key: username
+                  name: {{ .Values.existingSecret }}
+                  key: postgresql-username
             {{- end }}
             {{- end }}
             {{- with .Values.env }}
@@ -148,17 +148,17 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: hmac-key
-            {{- if .Values.postgresql.auth.existingSecret }}
+            {{- if .Values.existingSecret }}
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.postgresql.auth.existingSecret }}
-                  key: password
+                  name: {{ .Values.existingSecret }}
+                  key: postgresql-password
             - name: DB_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.postgresql.auth.existingSecret }}
-                  key: username
+                  name: {{ .Values.existingSecret }}
+                  key: postgresql-username
             {{- end }}
             {{- end }}
             {{- with .Values.env }}

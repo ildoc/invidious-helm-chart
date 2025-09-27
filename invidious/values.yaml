@@ -270,8 +270,6 @@ postgresql:
     password: kemal
     # -- PostgreSQL database name
     database: invidious
-    # -- Name of existing secret with password and postgres-password keys (recommended for production)
-    # existingSecret: ""
 
 # -- Invidious Companion configuration (replaces sighelper for YouTube interaction)
 companion:
@@ -394,10 +392,11 @@ config:
 
 # -- Secret management configuration
 # Use existingSecret to reference an existing Kubernetes secret for production deployments
+# This same secret will be used for both Invidious and PostgreSQL authentication
 existingSecret: ""
 # The secret should contain the following keys:
-# - password (PostgreSQL user password - matches auth.username)
-# - postgres-password (PostgreSQL postgres superuser password)  
+# - postgresql-username (PostgreSQL username - matches auth.username)
+# - postgres-password (PostgreSQL postgres superuser password)
 # - invidious-companion-key
 # - hmac-key
 
