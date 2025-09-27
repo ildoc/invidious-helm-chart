@@ -260,8 +260,8 @@ postgresql:
   enabled: true
   # -- PostgreSQL image configuration
   image:
-    # -- PostgreSQL version (aligned with docker-compose)
-    tag: 17
+    # -- PostgreSQL version (latest from chart 16.7.27)
+    tag: "17.6.0"
   # -- PostgreSQL authentication configuration
   auth:
     # -- PostgreSQL username
