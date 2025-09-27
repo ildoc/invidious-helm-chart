@@ -66,11 +66,11 @@ spec:
             - /bin/sh
             - -c
             - 'until pg_isready; do echo waiting for database; sleep 2; done'
-        {{- if .Values.existingSecret }}
-        - name: prepare-config
+        - name: init-db
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- if .Values.existingSecret }}
           env:
-            # Load individual secret values
+            # Load individual secret values for processing
             - name: COMPANION_KEY
               valueFrom:
                 secretKeyRef:
@@ -96,9 +96,6 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ template "invidious.fullname" . }}
-          volumeMounts:
-            - name: processed-config
-              mountPath: /shared
           command: ["/bin/sh", "-c"]
           args:
             - |
@@ -110,35 +107,21 @@ spec:
                   -e "s/__DB_PASSWORD__/${DB_PASSWORD}/g" \
                   -e "s/__DB_USERNAME__/${DB_USERNAME}/g" \
                   {{- end }} \
-                  > /shared/invidious_config.yml
-              echo "Configuration processed and saved to /shared/invidious_config.yml"
-              cat /shared/invidious_config.yml
-        {{- end }}
-        - name: init-db
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          {{- if .Values.existingSecret }}
-          volumeMounts:
-            - name: processed-config
-              mountPath: /shared
-          command: ["/bin/sh", "-c"]
-          args: 
-            - |
-              # Wait for the configuration file to be ready
-              while [ ! -f /shared/invidious_config.yml ] || [ ! -s /shared/invidious_config.yml ]; do
-                echo "Waiting for configuration to be prepared..."
-                sleep 2
-              done
+                  > /tmp/invidious_config.yml
               
-              # Load the processed configuration
-              export INVIDIOUS_CONFIG="$(cat /shared/invidious_config.yml)"
+              # Export the processed configuration
+              export INVIDIOUS_CONFIG="$(cat /tmp/invidious_config.yml)"
+              
               {{- with .Values.env }}
               {{- range . }}
               export {{ .name }}="{{ .value }}"
               {{- end }}
               {{- end }}
+              
               # Debug: show some config content
-              echo "Configuration loaded, first few lines:"
-              head -5 /shared/invidious_config.yml
+              echo "Configuration processed, first few lines:"
+              head -5 /tmp/invidious_config.yml
+              
               # Run the migration
               exec /sbin/tini -- /invidious/invidious --migrate
           {{- else }}
@@ -163,28 +146,59 @@ spec:
               containerPort: {{ .Values.config.port }}
               protocol: TCP
           {{- if .Values.existingSecret }}
-          volumeMounts:
-            - name: processed-config
-              mountPath: /shared
+          env:
+            # Load individual secret values for processing
+            - name: COMPANION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: invidious-companion-key
+            - name: HMAC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: hmac-key
+            {{- if .Values.postgresql.auth.existingSecret }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: postgresql-password
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: postgresql-username
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ template "invidious.fullname" . }}
           command: ["/bin/sh", "-c"]
           args: 
             - |
-              # Wait for the configuration file to be ready
-              while [ ! -f /shared/invidious_config.yml ] || [ ! -s /shared/invidious_config.yml ]; do
-                echo "Waiting for configuration to be prepared..."
-                sleep 2
-              done
+              # Process the config template by replacing placeholders with actual values
+              printf '%s\n' "${INVIDIOUS_CONFIG_TEMPLATE}" | sed \
+                  -e "s/__COMPANION_KEY__/${COMPANION_KEY}/g" \
+                  -e "s/__HMAC_KEY__/${HMAC_KEY}/g" \
+                  {{- if .Values.postgresql.auth.existingSecret }}
+                  -e "s/__DB_PASSWORD__/${DB_PASSWORD}/g" \
+                  -e "s/__DB_USERNAME__/${DB_USERNAME}/g" \
+                  {{- end }} \
+                  > /tmp/invidious_config.yml
               
-              # Load the processed configuration
-              export INVIDIOUS_CONFIG="$(cat /shared/invidious_config.yml)"
+              # Export the processed configuration
+              export INVIDIOUS_CONFIG="$(cat /tmp/invidious_config.yml)"
+              
               {{- with .Values.env }}
               {{- range . }}
               export {{ .name }}="{{ .value }}"
               {{- end }}
               {{- end }}
+              
               # Debug: show some config content
-              echo "Configuration loaded, first few lines:"
-              head -5 /shared/invidious_config.yml
+              echo "Configuration processed, first few lines:"
+              head -5 /tmp/invidious_config.yml
+              
               # Start the application
               exec /sbin/tini -- /invidious/invidious
           {{- else }}
@@ -238,11 +252,6 @@ spec:
             failureThreshold: 30
           {{- end }}
       restartPolicy: Always
-      {{- if .Values.existingSecret }}
-      volumes:
-        - name: processed-config
-          emptyDir: {}
-      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
