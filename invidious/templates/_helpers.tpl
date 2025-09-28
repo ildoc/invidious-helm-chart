@@ -103,10 +103,16 @@ Initialize default values and validate database configuration
         {{- end }}
     {{- end }}
 
-    {{/* Validate HMAC key for production ONLY if not using existingSecret */}}
+    {{/* Validate required secrets ONLY if not using existingSecret */}}
     {{- if not .Values.existingSecret }}
+        {{/* Validate HMAC key for production */}}
         {{- if not .Values.config.hmac_key }}
         {{- fail "hmac_key should be set for production use (via existingSecret or config.hmac_key)" }}
+        {{- end }}
+        
+        {{/* Validate database password */}}
+        {{- if not .Values.config.db.password }}
+        {{- fail "config.db.password must be set when not using existingSecret" }}
         {{- end }}
     {{- end }}
 
