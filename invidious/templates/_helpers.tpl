@@ -82,15 +82,19 @@ Initialize default values and validate database configuration
         {{- $_ := set (index .Values.config.invidious_companion 0) "private_url" $companionUrl }}
         {{- end }}
         
-        {{/* Validate companion key is provided */}}
-        {{- if and (not .Values.existingSecret) (not (and .Values.secrets .Values.secrets.companionKey)) (not .Values.config.invidious_companion_key) }}
-        {{- fail "invidious_companion_key must be set when companion.enabled is true (via existingSecret, secrets.companionKey, or config.invidious_companion_key)" }}
+        {{/* Validate companion key is provided - ONLY if not using existingSecret */}}
+        {{- if not .Values.existingSecret }}
+            {{- if not .Values.config.invidious_companion_key }}
+            {{- fail "invidious_companion_key must be set when companion.enabled is true (via existingSecret or config.invidious_companion_key)" }}
+            {{- end }}
         {{- end }}
     {{- end }}
 
-    {{/* Validate HMAC key for production */}}
-    {{- if and (not .Values.existingSecret) (not (and .Values.secrets .Values.secrets.hmacKey)) (not .Values.config.hmac_key) }}
-    {{- fail "hmac_key should be set for production use (via existingSecret, secrets.hmacKey, or config.hmac_key)" }}
+    {{/* Validate HMAC key for production - ONLY if not using existingSecret */}}
+    {{- if not .Values.existingSecret }}
+        {{- if not .Values.config.hmac_key }}
+        {{- fail "hmac_key should be set for production use (via existingSecret or config.hmac_key)" }}
+        {{- end }}
     {{- end }}
 
     {{/* Validate that Gateway and Ingress are not both enabled */}}
