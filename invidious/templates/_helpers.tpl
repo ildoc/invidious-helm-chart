@@ -59,6 +59,19 @@ Initialize default values and validate database configuration
     {{- if .Values.existingSecret }}
         {{/* Set the existingSecret for PostgreSQL */}}
         {{- $_ := set .Values.postgresql.auth "existingSecret" .Values.existingSecret }}
+        
+        {{/* When using existingSecret, set dummy values to pass validation */}}
+        {{- if .Values.companion.enabled }}
+            {{- if not .Values.config.invidious_companion_key }}
+                {{- $_ := set .Values.config "invidious_companion_key" "FROM_EXISTING_SECRET" }}
+            {{- end }}
+        {{- end }}
+        {{- if not .Values.config.hmac_key }}
+            {{- $_ := set .Values.config "hmac_key" "FROM_EXISTING_SECRET" }}
+        {{- end }}
+        {{- if not .Values.config.db.password }}
+            {{- $_ := set .Values.config.db "password" "FROM_EXISTING_SECRET" }}
+        {{- end }}
     {{- end }}
 
     {{/* Set default PostgreSQL host if using in-chart PostgreSQL */}}
@@ -82,7 +95,7 @@ Initialize default values and validate database configuration
         {{- $_ := set (index .Values.config.invidious_companion 0) "private_url" $companionUrl }}
         {{- end }}
         
-        {{/* Validate companion key is provided - ONLY if not using existingSecret */}}
+        {{/* Validate companion key is provided ONLY if not using existingSecret */}}
         {{- if not .Values.existingSecret }}
             {{- if not .Values.config.invidious_companion_key }}
             {{- fail "invidious_companion_key must be set when companion.enabled is true (via existingSecret or config.invidious_companion_key)" }}
@@ -90,7 +103,7 @@ Initialize default values and validate database configuration
         {{- end }}
     {{- end }}
 
-    {{/* Validate HMAC key for production - ONLY if not using existingSecret */}}
+    {{/* Validate HMAC key for production ONLY if not using existingSecret */}}
     {{- if not .Values.existingSecret }}
         {{- if not .Values.config.hmac_key }}
         {{- fail "hmac_key should be set for production use (via existingSecret or config.hmac_key)" }}
