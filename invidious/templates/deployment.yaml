@@ -91,6 +91,9 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: postgresql-username
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           envFrom:
             - secretRef:
                 name: {{ template "invidious.fullname" . }}
@@ -107,16 +110,6 @@ spec:
               
               # Export the processed configuration
               export INVIDIOUS_CONFIG="$(cat /tmp/invidious_config.yml)"
-              
-              {{- with .Values.env }}
-              {{- range . }}
-              export {{ .name }}="{{ .value }}"
-              {{- end }}
-              {{- end }}
-              
-              # Debug: show some config content
-              echo "Configuration processed, first few lines:"
-              head -5 /tmp/invidious_config.yml
               
               # Run the migration
               exec /sbin/tini -- /invidious/invidious --migrate
@@ -164,6 +157,9 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: postgresql-username
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           envFrom:
             - secretRef:
                 name: {{ template "invidious.fullname" . }}
@@ -180,16 +176,6 @@ spec:
               
               # Export the processed configuration
               export INVIDIOUS_CONFIG="$(cat /tmp/invidious_config.yml)"
-              
-              {{- with .Values.env }}
-              {{- range . }}
-              export {{ .name }}="{{ .value }}"
-              {{- end }}
-              {{- end }}
-              
-              # Debug: show some config content
-              echo "Configuration processed, first few lines:"
-              head -5 /tmp/invidious_config.yml
               
               # Start the application
               exec /sbin/tini -- /invidious/invidious

@@ -58,6 +58,10 @@ Initialize default values and validate database configuration
     {{/* Configure PostgreSQL to use existingSecret if specified */}}
     {{- if .Values.existingSecret }}
         {{- $_ := set .Values.postgresql.auth "existingSecret" .Values.existingSecret }}
+        {{/* Map all PostgreSQL password keys to the single 'postgresql-password' key */}}
+        {{- $_ := set .Values.postgresql.auth.secretKeys "adminPasswordKey" "postgresql-password" }}
+        {{- $_ := set .Values.postgresql.auth.secretKeys "userPasswordKey" "postgresql-password" }}
+        {{- $_ := set .Values.postgresql.auth.secretKeys "replicationPasswordKey" "postgresql-password" }}
     {{- end }}
 
     {{/* Set default PostgreSQL host if using in-chart PostgreSQL */}}
