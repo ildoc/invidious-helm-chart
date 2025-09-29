@@ -270,6 +270,8 @@ postgresql:
     password: kemal
     # -- PostgreSQL database name
     database: invidious
+
+    enablePostgresUser: true
     # -- Use existing secret for PostgreSQL authentication
     # IMPORTANT: Set this to the same value as the main existingSecret when using external secrets
     # This prevents PostgreSQL from generating its own passwords

@@ -42,16 +42,8 @@ spec:
               value: {{ .Values.config.db.host | quote }}
             - name: PGPORT
               value: {{ .Values.config.db.port | quote }}
-            {{- if .Values.existingSecret }}
-            - name: PGUSER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.existingSecret }}
-                  key: postgresql-username
-            {{- else }}
             - name: PGUSER
               value: {{ .Values.config.db.user | quote }}
-            {{- end }}
             {{- if .Values.existingSecret }}
             - name: PGPASSWORD
               valueFrom:
@@ -86,11 +78,6 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: postgresql-password
-            - name: DB_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.existingSecret }}
-                  key: postgresql-username
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -105,7 +92,6 @@ spec:
                   -e "s/__COMPANION_KEY__/${COMPANION_KEY}/g" \
                   -e "s/__HMAC_KEY__/${HMAC_KEY}/g" \
                   -e "s/__DB_PASSWORD__/${DB_PASSWORD}/g" \
-                  -e "s/__DB_USERNAME__/${DB_USERNAME}/g" \
                   > /tmp/invidious_config.yml
               
               # Export the processed configuration
@@ -152,11 +138,6 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: postgresql-password
-            - name: DB_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.existingSecret }}
-                  key: postgresql-username
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -171,7 +152,6 @@ spec:
                   -e "s/__COMPANION_KEY__/${COMPANION_KEY}/g" \
                   -e "s/__HMAC_KEY__/${HMAC_KEY}/g" \
                   -e "s/__DB_PASSWORD__/${DB_PASSWORD}/g" \
-                  -e "s/__DB_USERNAME__/${DB_USERNAME}/g" \
                   > /tmp/invidious_config.yml
               
               # Export the processed configuration
