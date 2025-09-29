@@ -55,12 +55,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Initialize default values and validate database configuration
 */}}
 {{- define "invidious.init-defaults" -}}
-    {{/* Configure PostgreSQL to use existingSecret if specified */}}
+    {{/* When using existingSecret, set dummy values to pass validation */}}
     {{- if .Values.existingSecret }}
-        {{/* Set the existingSecret for PostgreSQL */}}
-        {{- $_ := set .Values.postgresql.auth "existingSecret" .Values.existingSecret }}
-        
-        {{/* When using existingSecret, set dummy values to pass validation */}}
         {{- if .Values.companion.enabled }}
             {{- if not .Values.config.invidious_companion_key }}
                 {{- $_ := set .Values.config "invidious_companion_key" "FROM_EXISTING_SECRET" }}
